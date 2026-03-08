@@ -45,9 +45,9 @@ function usePrices(symbols: string[]) {
 }
 
 function ChangeCell({ value }: { value: number | null | undefined }) {
-  if (value == null) return <span className="text-gray-600">---</span>
+  if (value == null) return <span className="text-gray-600">—</span>
   return (
-    <span className={value >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+    <span className={`font-medium ${value >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
       {formatChange(value)}
     </span>
   )
@@ -83,8 +83,7 @@ function AmountCell({ holdingId, amount, onSave }: {
         onChange={e => setVal(e.target.value)}
         onBlur={commit}
         onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel() }}
-        className="w-28 text-right bg-gray-800 text-white font-mono text-sm tabular-nums rounded px-2 py-0.5 outline-none focus:ring-1 focus:ring-indigo-500"
-        style={{ color: '#e87800' }}
+        className="w-28 text-right bg-gray-700 text-white text-sm tabular-nums rounded-lg px-2 py-0.5 outline-none focus:ring-1 focus:ring-indigo-500"
       />
     )
   }
@@ -92,7 +91,7 @@ function AmountCell({ holdingId, amount, onSave }: {
     <span
       onClick={startEdit}
       title="Click to edit"
-      className="tabular-nums cursor-pointer hover:text-white transition-colors text-gray-400"
+      className="text-gray-400 text-sm tabular-nums cursor-pointer hover:text-white transition-colors"
     >
       {formatAmount(amount)}
     </span>
@@ -121,16 +120,16 @@ export default function Home() {
 
   return (
     <>
-      <main className="min-h-screen pb-24 relative z-10">
+      <main className="min-h-screen pb-24">
         <div className="max-w-5xl mx-auto px-6 py-10">
 
           {portfolios.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-48 text-gray-600 uppercase tracking-widest">
-              <p>// NO PORTFOLIOS //</p>
-              <p className="text-sm mt-2">CREATE ONE BELOW</p>
+            <div className="flex flex-col items-center justify-center py-48 text-gray-600">
+              <p className="text-lg font-medium">No portfolios yet</p>
+              <p className="text-sm mt-1 text-gray-600">Create one below to get started</p>
             </div>
           ) : (
-            <div className="flex flex-col gap-12">
+            <div className="flex flex-col gap-10">
               {portfolios.map(p => {
                 const myHoldings = holdings.filter(h => h.portfolioId === p.id)
                 const value = portfolioValue(p.id)
@@ -138,39 +137,39 @@ export default function Home() {
                 return (
                   <section key={p.id}>
                     {/* Portfolio header */}
-                    <div className="group flex items-start justify-between mb-3">
+                    <div className="group flex items-start justify-between mb-4">
                       <div>
                         <div className="flex items-center gap-3">
-                          <h2 className="text-2xl uppercase tracking-widest text-white">{p.name}</h2>
+                          <h2 className="text-2xl font-semibold tracking-tight text-white">{p.name}</h2>
                           <button
                             onClick={() => removePortfolio(p.id)}
                             className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all text-sm"
-                          >[ X ]</button>
+                          >✕</button>
                         </div>
-                        <p className="text-xs text-gray-600 uppercase tracking-widest mt-0.5">TOTAL VALUE</p>
-                        <p className="text-3xl lcd tabular-nums">{formatValue(value, currency)}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 uppercase tracking-wider">Total Value</p>
+                        <p className="text-3xl font-bold text-white tabular-nums mt-0.5">{formatValue(value, currency)}</p>
                       </div>
                     </div>
 
-                    {/* Table panel */}
-                    <div className="panel rounded-sm overflow-x-auto">
+                    {/* Table */}
+                    <div className="bg-gray-900 rounded-2xl overflow-hidden">
                       <table className="w-full border-collapse">
                         <thead>
-                          <tr className="text-xs text-gray-600 uppercase tracking-widest border-b border-dashed border-gray-700">
-                            <th className="text-left py-2 pl-4">TOKEN</th>
-                            <th className="text-right py-2 pr-4">AMOUNT</th>
-                            <th className="text-right py-2 pr-4">PRICE</th>
-                            <th className="text-right py-2 pr-4">1H</th>
-                            <th className="text-right py-2 pr-4">24H</th>
-                            <th className="text-right py-2 pr-4">VALUE</th>
-                            <th className="py-2 w-8" />
+                          <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-800">
+                            <th className="text-left py-3 pl-5 font-medium">Token</th>
+                            <th className="text-right py-3 pr-5 font-medium">Amount</th>
+                            <th className="text-right py-3 pr-5 font-medium">Price</th>
+                            <th className="text-right py-3 pr-5 font-medium">1h</th>
+                            <th className="text-right py-3 pr-5 font-medium">24h</th>
+                            <th className="text-right py-3 pr-5 font-medium">Value</th>
+                            <th className="py-3 w-8" />
                           </tr>
                         </thead>
                         <tbody>
                           {myHoldings.length === 0 ? (
                             <tr>
-                              <td colSpan={7} className="py-8 text-center text-gray-600 uppercase tracking-widest text-xs">
-                                // NO TOKENS //
+                              <td colSpan={7} className="py-10 text-center text-gray-600 text-sm">
+                                No tokens yet
                               </td>
                             </tr>
                           ) : myHoldings.map((h, i) => {
@@ -182,42 +181,44 @@ export default function Home() {
                             return (
                               <tr
                                 key={h.id}
-                                className={`group/row hover:bg-gray-800 transition-colors ${!isLast ? 'border-b border-dashed border-gray-700' : ''}`}
+                                className={`group/row hover:bg-gray-800 transition-colors ${!isLast ? 'border-b border-gray-800' : ''}`}
                               >
-                                <td className="pl-4 py-3">
+                                <td className="pl-5 py-4">
                                   <div className="flex items-center gap-3">
                                     {pd?.image ? (
                                       // eslint-disable-next-line @next/next/no-img-element
-                                      <img src={pd.image} alt={pd.name} width={22} height={22} className="rounded-full flex-shrink-0 opacity-80" />
+                                      <img src={pd.image} alt={pd.name} width={36} height={36} className="rounded-full flex-shrink-0" />
                                     ) : (
-                                      <div className="w-[22px] h-[22px] border border-dashed border-gray-600 flex-shrink-0" />
+                                      <div className="w-9 h-9 rounded-full bg-gray-700 flex-shrink-0 flex items-center justify-center text-xs text-gray-500 font-bold">
+                                        {h.symbol.slice(0, 2)}
+                                      </div>
                                     )}
                                     <div>
-                                      <span className="text-white uppercase tracking-wider">{h.symbol}</span>
-                                      {pd?.name && <p className="text-xs text-gray-600 leading-tight uppercase tracking-wide">{pd.name}</p>}
+                                      <p className="font-semibold text-white text-sm">{h.symbol}</p>
+                                      {pd?.name && <p className="text-xs text-gray-500 leading-tight">{pd.name}</p>}
                                     </div>
                                   </div>
                                 </td>
-                                <td className="text-right pr-4 py-3">
+                                <td className="text-right pr-5 py-4">
                                   <AmountCell holdingId={h.id} amount={h.amount} onSave={(id, amt) => updateHolding(id, { amount: amt })} />
                                 </td>
-                                <td className="text-right pr-4 py-3 text-gray-400 tabular-nums">
-                                  {pd ? formatPrice(price!, currency) : <span className="text-gray-700">---</span>}
+                                <td className="text-right pr-5 py-4 text-gray-300 text-sm tabular-nums">
+                                  {pd ? formatPrice(price!, currency) : <span className="text-gray-600">—</span>}
                                 </td>
-                                <td className="text-right pr-4 py-3 tabular-nums">
+                                <td className="text-right pr-5 py-4 text-sm tabular-nums">
                                   <ChangeCell value={pd?.change1h} />
                                 </td>
-                                <td className="text-right pr-4 py-3 tabular-nums">
+                                <td className="text-right pr-5 py-4 text-sm tabular-nums">
                                   <ChangeCell value={pd?.change24h} />
                                 </td>
-                                <td className="text-right pr-4 py-3 tabular-nums lcd">
-                                  {val != null ? formatValue(val, currency) : <span className="text-gray-700" style={{ color: 'inherit', textShadow: 'none', opacity: 0.3 }}>---</span>}
+                                <td className="text-right pr-5 py-4 text-white font-semibold text-sm tabular-nums">
+                                  {val != null ? formatValue(val, currency) : <span className="text-gray-600">—</span>}
                                 </td>
-                                <td className="pr-3 py-3 w-8">
+                                <td className="pr-4 py-4 w-8">
                                   <button
                                     onClick={() => removeHolding(h.id)}
                                     className="opacity-0 group-hover/row:opacity-100 text-gray-600 hover:text-red-400 transition-all text-xs"
-                                  >[ X ]</button>
+                                  >✕</button>
                                 </td>
                               </tr>
                             )
@@ -225,13 +226,13 @@ export default function Home() {
                         </tbody>
                       </table>
 
-                      {/* Add token row */}
-                      <div className="flex justify-end px-3 py-2 border-t border-dashed border-gray-700">
+                      {/* Add token */}
+                      <div className="flex justify-end px-4 py-3 border-t border-gray-800">
                         <button
                           onClick={() => setAddingTo(p.id)}
-                          className="text-gray-600 hover:text-white text-xs uppercase tracking-widest transition-colors px-2 py-1 hover:bg-gray-800"
+                          className="text-gray-500 hover:text-white text-sm transition-colors px-3 py-1.5 rounded-lg hover:bg-gray-700 flex items-center gap-1.5"
                         >
-                          [ + ADD TOKEN ]
+                          <span className="text-base leading-none">+</span> Add Token
                         </button>
                       </div>
                     </div>
@@ -243,25 +244,25 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Footer panel */}
-      <footer className="fixed bottom-0 left-0 right-0 z-40 border-t border-dashed border-gray-700" style={{ background: '#0b0e07ee', backdropFilter: 'blur(8px)' }}>
-        <div className="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
+      {/* Footer */}
+      <footer className="fixed bottom-0 left-0 right-0 z-40 bg-gray-900/90 backdrop-blur-md border-t border-gray-800">
+        <div className="max-w-5xl mx-auto px-6 py-3.5 flex items-center justify-between">
           <div>
-            <p className="text-xs text-gray-600 uppercase tracking-widest">// TOTAL</p>
-            <p className="text-xl lcd tabular-nums">{formatValue(grandTotal, currency)}</p>
+            <p className="text-xs text-gray-500 uppercase tracking-wider">Total</p>
+            <p className="text-xl font-bold text-white tabular-nums">{formatValue(grandTotal, currency)}</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={toggleCurrency}
-              className="px-3 py-1 border border-dashed border-gray-600 text-gray-400 hover:text-white hover:border-gray-400 text-sm uppercase tracking-widest transition-colors"
+              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-sm font-medium rounded-xl transition-colors"
             >
-              {currency === 'usd' ? '[ $ USD ]' : '[ £ GBP ]'}
+              {currency === 'usd' ? '$ USD' : '£ GBP'}
             </button>
             <button
               onClick={() => setShowCreate(true)}
-              className="px-3 py-1 border border-dashed border-indigo-600 text-indigo-500 hover:bg-indigo-600 hover:text-gray-950 text-sm uppercase tracking-widest transition-colors"
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-colors"
             >
-              [ + NEW PORTFOLIO ]
+              <span className="text-base leading-none">+</span> New Portfolio
             </button>
           </div>
         </div>

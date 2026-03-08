@@ -47,14 +47,13 @@ export default function LockPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center gap-8 relative z-10">
-      <div className="flex flex-col items-center gap-1">
-        <p className="text-xs text-gray-600 uppercase tracking-widest">// ACCESS CONTROL //</p>
-        <h1 className="text-3xl uppercase tracking-widest text-white">ENTER PASSCODE</h1>
+    <main className="min-h-screen bg-gray-950 flex flex-col items-center justify-center gap-8">
+      <div className="text-center">
+        <h1 className="text-2xl font-semibold text-white">Enter Passcode</h1>
+        <p className="text-sm text-gray-500 mt-1">4-digit PIN required</p>
       </div>
 
-      {/* LCD-style digit display */}
-      <div className="panel rounded-sm p-6 flex flex-col items-center gap-4">
+      <div className="bg-gray-900 rounded-2xl p-8 flex flex-col items-center gap-6 shadow-2xl">
         <div className="flex gap-3">
           {digits.map((digit, i) => (
             <input
@@ -68,17 +67,16 @@ export default function LockPage() {
               onKeyDown={e => handleKeyDown(i, e)}
               disabled={loading}
               className={[
-                'w-14 h-14 text-center text-3xl border border-dashed outline-none transition-colors',
-                'bg-gray-900',
-                error ? 'border-red-400 text-red-400' : 'border-gray-600 focus:border-gray-400',
+                'w-14 h-14 text-center text-2xl font-bold rounded-xl',
+                'bg-gray-800 text-white outline-none',
+                'border-2 transition-colors',
+                error ? 'border-red-500' : 'border-gray-700 focus:border-indigo-500',
               ].join(' ')}
-              style={{ fontFamily: 'inherit', color: error ? undefined : '#e87800', caretColor: '#e87800' }}
             />
           ))}
         </div>
-
-        <p className={`text-xs uppercase tracking-widest transition-opacity ${error ? 'text-red-400 opacity-100' : 'opacity-0'}`}>
-          // ACCESS DENIED //
+        <p className={`text-red-400 text-sm transition-opacity ${error ? 'opacity-100' : 'opacity-0'}`}>
+          Incorrect passcode
         </p>
       </div>
     </main>

@@ -1,74 +1,43 @@
-@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 @import "tailwindcss";
 
 @theme {
-  /* Olive/military green palette replacing grays */
-  --color-gray-950: #0b0e07;
-  --color-gray-900: #111508;
-  --color-gray-800: #1a2010;
-  --color-gray-700: #242e15;
-  --color-gray-600: #3a4a20;
-  --color-gray-500: #556835;
-  --color-gray-400: #7a9050;
-  --color-gray-300: #a8b878;
+  /* Deep navy palette */
+  --color-gray-950: #1a1b2e;
+  --color-gray-900: #22233a;
+  --color-gray-800: #2a2c45;
+  --color-gray-700: #353760;
+  --color-gray-600: #505578;
+  --color-gray-500: #7880a8;
+  --color-gray-400: #a0a8c8;
+  --color-gray-300: #c8cce0;
+  --color-white: #eeeef8;
 
-  /* White → cream */
-  --color-white: #cfc298;
+  /* Accent — purple */
+  --color-indigo-600: #6c5ff5;
+  --color-indigo-500: #7c70f8;
+  --color-indigo-400: #9088fa;
 
-  /* Indigo → amber/orange (buttons, focus rings) */
-  --color-indigo-600: #b05a00;
-  --color-indigo-500: #d06e00;
-  --color-indigo-400: #e88000;
+  /* Positive — green */
+  --color-emerald-400: #26d67a;
+  --color-emerald-500: #1ec066;
 
-  /* Positive change → amber */
-  --color-emerald-400: #e87800;
+  /* Negative */
+  --color-red-400: #ff5c5c;
+  --color-red-500: #e84545;
 
-  /* Negative → keep red-ish */
-  --color-red-400: #cc3a1a;
-  --color-red-500: #a82e12;
-
-  /* Font sizes — bump up for VT323 legibility */
-  --text-xs: 0.85rem;
-  --text-sm: 1rem;
-  --text-base: 1.15rem;
-  --text-lg: 1.35rem;
-  --text-xl: 1.6rem;
-  --text-2xl: 2rem;
-  --text-3xl: 2.6rem;
+  /* Font */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
 }
 
 :root {
-  --background: #0b0e07;
-  --foreground: #cfc298;
-  --amber: #e87800;
+  --background: #1a1b2e;
+  --foreground: #eeeef8;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'VT323', 'Courier New', monospace;
-  font-size: 1.1rem;
-  letter-spacing: 0.04em;
-}
-
-/* Subtle dot-matrix texture on background */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: radial-gradient(circle, rgba(200,185,140,0.04) 1px, transparent 1px);
-  background-size: 4px 4px;
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* LCD amber glow for values */
-.lcd {
-  color: var(--amber);
-  text-shadow: 0 0 8px rgba(232,120,0,0.5);
-}
-
-.panel {
-  border: 1px dashed #3a4a20;
-  background: #111508;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
 }
