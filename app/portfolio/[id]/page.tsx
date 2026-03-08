@@ -6,26 +6,23 @@ import { useParams } from 'next/navigation'
 import { usePortfolioStore, useInitStore } from '@/store/portfolioStore'
 import AddHoldingModal from '@/components/AddHoldingModal'
 import { formatPrice, formatValue, formatAmount, formatChange } from '@/lib/format'
-
-interface PriceData {
-  price: number
-  change24h: number
-}
+import type { PriceData } from '@/app/api/prices/route'
 
 function usePrices(symbols: string[]) {
   const [prices, setPrices] = useState<Record<string, PriceData>>({})
   const [loading, setLoading] = useState(false)
+  const key = symbols.join(',')
 
   const fetchPrices = useCallback(async () => {
-    if (symbols.length === 0) return
+    if (!key) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/prices?symbols=${symbols.join(',')}`)
+      const res = await fetch(`/api/prices?symbols=${key}`)
       if (res.ok) setPrices(await res.json())
     } finally {
       setLoading(false)
     }
-  }, [symbols.join(',')])  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key])
 
   useEffect(() => {
     fetchPrices()
@@ -34,6 +31,15 @@ function usePrices(symbols: string[]) {
   }, [fetchPrices])
 
   return { prices, loading }
+}
+
+function ChangeCell({ value }: { value: number | null }) {
+  if (value == null) return <span className="text-gray-600">—</span>
+  return (
+    <span className={value >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+      {formatChange(value)}
+    </span>
+  )
 }
 
 export default function PortfolioPage() {
@@ -62,9 +68,7 @@ export default function PortfolioPage() {
       <main className="min-h-screen bg-gray-950 text-white flex items-center justify-center">
         <div className="text-center">
           <p className="text-gray-500">Portfolio not found</p>
-          <Link href="/" className="text-indigo-400 text-sm mt-2 inline-block hover:text-indigo-300">
-            ← Back
-          </Link>
+          <Link href="/" className="text-indigo-400 text-sm mt-2 inline-block hover:text-indigo-300">← Back</Link>
         </div>
       </main>
     )
@@ -72,13 +76,11 @@ export default function PortfolioPage() {
 
   return (
     <main className="min-h-screen bg-gray-950 text-white">
-      <div className="max-w-3xl mx-auto px-6 py-12">
+      <div className="max-w-5xl mx-auto px-6 py-12">
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-2">
-          <Link href="/" className="text-gray-500 hover:text-white transition-colors text-sm">
-            ← Portfolios
-          </Link>
+          <Link href="/" className="text-gray-500 hover:text-white transition-colors text-sm">← Portfolios</Link>
           <span className="text-gray-700">/</span>
           <h1 className="text-2xl font-bold tracking-tight">{portfolio.name}</h1>
           <div className="ml-auto">
@@ -108,81 +110,96 @@ export default function PortfolioPage() {
             <p className="text-sm mt-1">Add your first holding</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
-            {/* Column headers */}
-            <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 px-4 pb-2 text-xs text-gray-600 uppercase tracking-wider">
-              <span>Token</span>
-              <span className="text-right w-28">Amount</span>
-              <span className="text-right w-24">Price</span>
-              <span className="text-right w-16">24h</span>
-              <span className="text-right w-24">Value</span>
-            </div>
+          <div className="w-full overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="text-xs text-gray-600 uppercase tracking-wider">
+                  <th className="text-left pb-3 pl-4">Token</th>
+                  <th className="text-right pb-3 pr-4">Amount</th>
+                  <th className="text-right pb-3 pr-4">Price</th>
+                  <th className="text-right pb-3 pr-4">1h</th>
+                  <th className="text-right pb-3 pr-4">24h</th>
+                  <th className="text-right pb-3 pr-4">Value</th>
+                  <th className="pb-3 w-8" />
+                </tr>
+              </thead>
+              <tbody className="space-y-2">
+                {myHoldings.map(h => {
+                  const p = prices[h.symbol]
+                  const value = p != null ? h.amount * p.price : null
 
-            {myHoldings.map(h => {
-              const p = prices[h.symbol]
-              const value = p != null ? h.amount * p.price : null
-
-              return (
-                <div
-                  key={h.id}
-                  className="group grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 items-center bg-gray-900 border border-gray-800 rounded-xl px-4 py-4 hover:border-gray-700 transition-colors"
-                >
-                  {/* Symbol */}
-                  <div className="flex items-center gap-3">
-                    <span className="font-semibold text-white">{h.symbol}</span>
-                    <button
-                      onClick={() => removeHolding(h.id)}
-                      className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all text-xs"
-                      title="Remove"
+                  return (
+                    <tr
+                      key={h.id}
+                      className="group bg-gray-900 border border-gray-800 hover:border-gray-700 transition-colors"
                     >
-                      ✕
-                    </button>
-                  </div>
+                      {/* Token: icon + symbol + name */}
+                      <td className="pl-4 py-4 rounded-l-xl">
+                        <div className="flex items-center gap-3">
+                          {p?.image ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={p.image} alt={p.name} width={28} height={28} className="rounded-full flex-shrink-0" />
+                          ) : (
+                            <div className="w-7 h-7 rounded-full bg-gray-800 flex-shrink-0" />
+                          )}
+                          <div>
+                            <span className="font-semibold text-white text-sm">{h.symbol}</span>
+                            {p?.name && <p className="text-xs text-gray-500 leading-tight">{p.name}</p>}
+                          </div>
+                        </div>
+                      </td>
 
-                  {/* Amount */}
-                  <span className="text-right text-gray-400 font-mono text-sm w-28">
-                    {formatAmount(h.amount)}
-                  </span>
+                      {/* Amount */}
+                      <td className="text-right pr-4 py-4 text-gray-400 font-mono text-sm tabular-nums">
+                        {formatAmount(h.amount)}
+                      </td>
 
-                  {/* Price */}
-                  <span className="text-right text-gray-300 font-mono text-sm w-24">
-                    {loading && !p ? (
-                      <span className="text-gray-600">—</span>
-                    ) : p ? (
-                      formatPrice(p.price)
-                    ) : (
-                      <span className="text-gray-600">—</span>
-                    )}
-                  </span>
+                      {/* Price */}
+                      <td className="text-right pr-4 py-4 text-gray-300 font-mono text-sm tabular-nums">
+                        {loading && !p ? <span className="text-gray-600">—</span> : p ? formatPrice(p.price) : <span className="text-gray-600">—</span>}
+                      </td>
 
-                  {/* 24h change */}
-                  <span className={`text-right font-mono text-sm w-16 ${
-                    p == null ? 'text-gray-600' :
-                    p.change24h >= 0 ? 'text-emerald-400' : 'text-red-400'
-                  }`}>
-                    {p ? formatChange(p.change24h) : '—'}
-                  </span>
+                      {/* 1h */}
+                      <td className="text-right pr-4 py-4 font-mono text-sm tabular-nums">
+                        <ChangeCell value={p?.change1h ?? null} />
+                      </td>
 
-                  {/* Value */}
-                  <span className="text-right text-white font-mono text-sm w-24">
-                    {value != null ? formatValue(value) : <span className="text-gray-600">—</span>}
-                  </span>
-                </div>
-              )
-            })}
+                      {/* 24h */}
+                      <td className="text-right pr-4 py-4 font-mono text-sm tabular-nums">
+                        <ChangeCell value={p?.change24h ?? null} />
+                      </td>
 
-            {/* Total row */}
-            {myHoldings.length > 1 && (
-              <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-4 items-center px-4 pt-2 mt-1 border-t border-gray-800">
-                <span className="text-gray-500 text-sm">Total</span>
-                <span className="w-28" />
-                <span className="w-24" />
-                <span className="w-16" />
-                <span className="text-right text-white font-semibold font-mono text-sm w-24">
-                  {formatValue(totalValue)}
-                </span>
-              </div>
-            )}
+                      {/* Value */}
+                      <td className="text-right pr-4 py-4 text-white font-mono text-sm tabular-nums">
+                        {value != null ? formatValue(value) : <span className="text-gray-600">—</span>}
+                      </td>
+
+                      {/* Delete */}
+                      <td className="pr-3 py-4 rounded-r-xl">
+                        <button
+                          onClick={() => removeHolding(h.id)}
+                          className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all text-xs"
+                          title="Remove"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              {myHoldings.length > 1 && (
+                <tfoot>
+                  <tr className="border-t border-gray-800">
+                    <td colSpan={5} className="pt-3 pl-4 text-gray-500 text-sm">Total</td>
+                    <td className="pt-3 pr-4 text-right text-white font-semibold font-mono text-sm tabular-nums">
+                      {formatValue(totalValue)}
+                    </td>
+                    <td />
+                  </tr>
+                </tfoot>
+              )}
+            </table>
           </div>
         )}
       </div>

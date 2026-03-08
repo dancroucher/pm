@@ -70,11 +70,15 @@ const SYMBOL_TO_ID: Record<string, string> = {
   EOS: 'eos',
 }
 
-interface CacheEntry {
+export interface PriceData {
   price: number
+  change1h: number | null
   change24h: number
-  ts: number
+  name: string
+  image: string
 }
+
+interface CacheEntry extends PriceData { ts: number }
 
 interface GeckoSearchCoin {
   id: string
@@ -82,8 +86,18 @@ interface GeckoSearchCoin {
   market_cap_rank: number | null
 }
 
+interface GeckoMarket {
+  id: string
+  name: string
+  image: string
+  current_price: number
+  price_change_percentage_1h_in_currency: number | null
+  price_change_percentage_24h_in_currency: number | null
+  price_change_percentage_24h: number | null
+}
+
 const priceCache = new Map<string, CacheEntry>()
-const idLookupCache = new Map<string, string>() // symbol -> geckoId
+const idLookupCache = new Map<string, string>()
 const CACHE_TTL = 60_000
 
 async function resolveId(symbol: string): Promise<string | null> {
@@ -117,51 +131,63 @@ export async function GET(request: NextRequest) {
 
   if (symbols.length === 0) return NextResponse.json({})
 
-  // Separate cached from uncached
   const now = Date.now()
-  const cached: Record<string, { price: number; change24h: number }> = {}
+  const result: Record<string, PriceData> = {}
   const needFetch: string[] = []
 
   for (const sym of symbols) {
     const entry = priceCache.get(sym)
     if (entry && now - entry.ts < CACHE_TTL) {
-      cached[sym] = { price: entry.price, change24h: entry.change24h }
+      const { ts: _ts, ...data } = entry
+      result[sym] = data
     } else {
       needFetch.push(sym)
     }
   }
 
-  if (needFetch.length === 0) return NextResponse.json(cached)
+  if (needFetch.length === 0) return NextResponse.json(result)
 
   // Resolve symbols → CoinGecko IDs
   const idEntries = await Promise.all(
     needFetch.map(async sym => [sym, await resolveId(sym)] as const)
   )
-  const symToId = Object.fromEntries(idEntries.filter(([, id]) => id != null)) as Record<string, string>
+  const symToId = Object.fromEntries(
+    idEntries.filter(([, id]) => id != null)
+  ) as Record<string, string>
   const ids = [...new Set(Object.values(symToId))]
 
-  if (ids.length === 0) return NextResponse.json(cached)
+  if (ids.length === 0) return NextResponse.json(result)
 
   try {
-    const res = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(',')}&vs_currencies=usd&include_24hr_change=true`
-    )
-    if (!res.ok) return NextResponse.json(cached)
+    const url =
+      `https://api.coingecko.com/api/v3/coins/markets` +
+      `?vs_currency=usd` +
+      `&ids=${ids.join(',')}` +
+      `&price_change_percentage=1h,24h` +
+      `&per_page=250`
 
-    const data: Record<string, { usd: number; usd_24h_change: number }> = await res.json()
+    const res = await fetch(url)
+    if (!res.ok) return NextResponse.json(result)
+
+    const markets: GeckoMarket[] = await res.json()
+    const byId = Object.fromEntries(markets.map(m => [m.id, m]))
 
     for (const [sym, geckoId] of Object.entries(symToId)) {
-      const entry = data[geckoId]
-      if (entry) {
-        const price = entry.usd
-        const change24h = entry.usd_24h_change ?? 0
-        priceCache.set(sym, { price, change24h, ts: now })
-        cached[sym] = { price, change24h }
+      const m = byId[geckoId]
+      if (!m) continue
+      const data: PriceData = {
+        price: m.current_price,
+        change1h: m.price_change_percentage_1h_in_currency ?? null,
+        change24h: m.price_change_percentage_24h_in_currency ?? m.price_change_percentage_24h ?? 0,
+        name: m.name,
+        image: m.image,
       }
+      priceCache.set(sym, { ...data, ts: now })
+      result[sym] = data
     }
   } catch {
-    // Return whatever we have cached
+    // return whatever we have
   }
 
-  return NextResponse.json(cached)
+  return NextResponse.json(result)
 }
