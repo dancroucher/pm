@@ -168,17 +168,6 @@ export default function Home() {
                             })
                           )}
                         </tbody>
-                        {myHoldings.length > 1 && (
-                          <tfoot>
-                            <tr className="border-t border-gray-800">
-                              <td colSpan={5} className="pl-4 py-3 text-gray-600 text-xs uppercase tracking-wider">Total</td>
-                              <td className="pr-4 py-3 text-right text-white font-semibold font-mono text-sm tabular-nums">
-                                {formatValue(value)}
-                              </td>
-                              <td />
-                            </tr>
-                          </tfoot>
-                        )}
                       </table>
 
                       {/* Add token — bottom right of table */}
