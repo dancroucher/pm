@@ -30,21 +30,22 @@ function usePrices(symbols: string[]) {
   const [prices, setPrices] = useState<Record<string, PriceData>>({})
   const [loading, setLoading] = useState(false)
   const key = symbols.join(',')
-  const fetchPrices = useCallback(async () => {
+  const fetchPrices = useCallback(async (force = false) => {
     if (!key) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/prices?symbols=${key}`)
+      const url = force ? `/api/prices?symbols=${key}&force=1` : `/api/prices?symbols=${key}`
+      const res = await fetch(url)
       if (res.ok) setPrices(await res.json())
     } catch {}
     finally { setLoading(false) }
   }, [key])
   useEffect(() => {
-    fetchPrices()
-    const id = setInterval(fetchPrices, 60_000)
+    fetchPrices(false)
+    const id = setInterval(() => fetchPrices(false), 60_000)
     return () => clearInterval(id)
   }, [fetchPrices])
-  return { prices, loading, refresh: fetchPrices }
+  return { prices, loading, refresh: () => fetchPrices(true) }
 }
 
 function RefreshButton({ onClick, spinning }: { onClick: () => void; spinning: boolean }) {
@@ -170,10 +171,7 @@ export default function Home() {
                           >✕</button>
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5 uppercase tracking-wider">Total Value</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <p className="text-3xl font-bold text-white tabular-nums">{formatValue(value, currency)}</p>
-                          <RefreshButton onClick={refresh} spinning={loading} />
-                        </div>
+                        <p className="text-3xl font-bold text-white tabular-nums mt-0.5">{formatValue(value, currency)}</p>
                       </div>
                     </div>
 

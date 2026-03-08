@@ -55,7 +55,10 @@ async function resolveId(symbol: string): Promise<string | null> {
   if (SYMBOL_TO_ID[symbol]) return SYMBOL_TO_ID[symbol]
   if (idLookupCache.has(symbol)) return idLookupCache.get(symbol)!
   try {
-    const res = await fetch(`https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(symbol)}`)
+    const res = await fetch(
+      `https://api.coingecko.com/api/v3/search?query=${encodeURIComponent(symbol)}`,
+      { next: { revalidate: 3600 } }
+    )
     if (!res.ok) return null
     const json = await res.json()
     const coins: GeckoSearchCoin[] = json.coins ?? []
@@ -68,16 +71,28 @@ async function resolveId(symbol: string): Promise<string | null> {
   } catch { return null }
 }
 
-async function fetchMarkets(ids: string[], vsCurrency: string): Promise<GeckoMarket[]> {
+async function fetchMarkets(ids: string[], vsCurrency: string, force = false): Promise<GeckoMarket[]> {
   const url = `https://api.coingecko.com/api/v3/coins/markets` +
     `?vs_currency=${vsCurrency}&ids=${ids.join(',')}&price_change_percentage=1h,24h&per_page=250`
-  const res = await fetch(url)
-  if (!res.ok) return []
+
+  const headers: Record<string, string> = { 'Accept': 'application/json' }
+  const apiKey = process.env.COINGECKO_API_KEY
+  if (apiKey) headers['x-cg-demo-api-key'] = apiKey
+
+  const res = await fetch(url, {
+    headers,
+    next: force ? { revalidate: 0 } : { revalidate: 60 },
+  })
+  if (!res.ok) {
+    console.error(`CoinGecko ${vsCurrency} error: ${res.status} ${await res.text().catch(() => '')}`)
+    return []
+  }
   return res.json()
 }
 
 export async function GET(request: NextRequest) {
   const symbolsParam = request.nextUrl.searchParams.get('symbols') ?? ''
+  const force = request.nextUrl.searchParams.get('force') === '1'
   const symbols = [...new Set(symbolsParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean))]
   if (symbols.length === 0) return NextResponse.json({})
 
@@ -104,8 +119,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const [usdMarkets, gbpMarkets] = await Promise.all([
-      fetchMarkets(ids, 'usd'),
-      fetchMarkets(ids, 'gbp'),
+      fetchMarkets(ids, 'usd', force),
+      fetchMarkets(ids, 'gbp', force),
     ])
 
     const usdById = Object.fromEntries(usdMarkets.map(m => [m.id, m]))
