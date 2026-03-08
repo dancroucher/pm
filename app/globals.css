@@ -1,13 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
 @import "tailwindcss";
 
+@theme {
+  /* Olive/military green palette replacing grays */
+  --color-gray-950: #0b0e07;
+  --color-gray-900: #111508;
+  --color-gray-800: #1a2010;
+  --color-gray-700: #242e15;
+  --color-gray-600: #3a4a20;
+  --color-gray-500: #556835;
+  --color-gray-400: #7a9050;
+  --color-gray-300: #a8b878;
+
+  /* White → cream */
+  --color-white: #cfc298;
+
+  /* Indigo → amber/orange (buttons, focus rings) */
+  --color-indigo-600: #b05a00;
+  --color-indigo-500: #d06e00;
+  --color-indigo-400: #e88000;
+
+  /* Positive change → amber */
+  --color-emerald-400: #e87800;
+
+  /* Negative → keep red-ish */
+  --color-red-400: #cc3a1a;
+  --color-red-500: #a82e12;
+
+  /* Font sizes — bump up for VT323 legibility */
+  --text-xs: 0.85rem;
+  --text-sm: 1rem;
+  --text-base: 1.15rem;
+  --text-lg: 1.35rem;
+  --text-xl: 1.6rem;
+  --text-2xl: 2rem;
+  --text-3xl: 2.6rem;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0b0e07;
+  --foreground: #cfc298;
+  --amber: #e87800;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: system-ui, -apple-system, sans-serif;
-  font-size: 15px;
+  font-family: 'VT323', 'Courier New', monospace;
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+}
+
+/* Subtle dot-matrix texture on background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(200,185,140,0.04) 1px, transparent 1px);
+  background-size: 4px 4px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* LCD amber glow for values */
+.lcd {
+  color: var(--amber);
+  text-shadow: 0 0 8px rgba(232,120,0,0.5);
+}
+
+.panel {
+  border: 1px dashed #3a4a20;
+  background: #111508;
 }
