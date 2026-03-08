@@ -1,13 +1,24 @@
-export function formatPrice(price: number): string {
-  if (price >= 1000) return price.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
-  if (price >= 1) return price.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
-  if (price >= 0.01) return price.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 4 })
-  // Very small prices — show 4 significant figures
-  return '$' + price.toPrecision(4)
+export type Currency = 'usd' | 'gbp'
+
+export function formatPrice(price: number, currency: Currency = 'usd'): string {
+  const curr = currency.toUpperCase()
+  if (price >= 0.01) {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: curr,
+      maximumFractionDigits: price >= 1 ? 2 : 4,
+    }).format(price)
+  }
+  const sym = currency === 'gbp' ? '£' : '$'
+  return sym + price.toPrecision(4)
 }
 
-export function formatValue(value: number): string {
-  return value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
+export function formatValue(value: number, currency: Currency = 'usd'): string {
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: currency.toUpperCase(),
+    maximumFractionDigits: 2,
+  }).format(value)
 }
 
 export function formatAmount(amount: number): string {

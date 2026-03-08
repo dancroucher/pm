@@ -1,11 +1,33 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { usePortfolioStore, useInitStore } from '@/store/portfolioStore'
 import CreatePortfolioModal from '@/components/CreatePortfolioModal'
 import AddHoldingModal from '@/components/AddHoldingModal'
 import { formatPrice, formatValue, formatAmount, formatChange } from '@/lib/format'
+import type { Currency } from '@/lib/format'
 import type { PriceData } from '@/app/api/prices/route'
+
+const CURRENCY_KEY = 'jeem-folio-currency'
+
+function useCurrency(): [Currency, () => void] {
+  const [currency, setCurrency] = useState<Currency>('usd')
+
+  useEffect(() => {
+    const saved = localStorage.getItem(CURRENCY_KEY)
+    if (saved === 'gbp' || saved === 'usd') setCurrency(saved)
+  }, [])
+
+  const toggle = useCallback(() => {
+    setCurrency(c => {
+      const next: Currency = c === 'usd' ? 'gbp' : 'usd'
+      localStorage.setItem(CURRENCY_KEY, next)
+      return next
+    })
+  }, [])
+
+  return [currency, toggle]
+}
 
 function usePrices(symbols: string[]) {
   const [prices, setPrices] = useState<Record<string, PriceData>>({})
@@ -37,12 +59,61 @@ function ChangeCell({ value }: { value: number | null | undefined }) {
   )
 }
 
+function AmountCell({
+  holdingId, amount, onSave,
+}: { holdingId: string; amount: number; onSave: (id: string, amount: number) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const startEdit = () => {
+    setVal(amount.toString())
+    setEditing(true)
+    setTimeout(() => inputRef.current?.select(), 0)
+  }
+
+  const commit = () => {
+    const parsed = parseFloat(val)
+    if (!isNaN(parsed) && parsed > 0) onSave(holdingId, parsed)
+    setEditing(false)
+  }
+
+  const cancel = () => setEditing(false)
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="number"
+        value={val}
+        min="0"
+        step="any"
+        onChange={e => setVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel() }}
+        className="w-28 text-right bg-gray-800 text-white font-mono text-sm tabular-nums rounded px-2 py-0.5 outline-none focus:ring-1 focus:ring-indigo-500"
+      />
+    )
+  }
+
+  return (
+    <span
+      onClick={startEdit}
+      title="Click to edit"
+      className="text-gray-400 font-mono text-sm tabular-nums cursor-pointer hover:text-white transition-colors"
+    >
+      {formatAmount(amount)}
+    </span>
+  )
+}
+
 export default function Home() {
   useInitStore()
-  const { portfolios, holdings, addPortfolio, removePortfolio, addHolding, removeHolding } = usePortfolioStore()
+  const { portfolios, holdings, addPortfolio, removePortfolio, addHolding, removeHolding, updateHolding } = usePortfolioStore()
   const [showCreate, setShowCreate] = useState(false)
   const [addingTo, setAddingTo] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [currency, toggleCurrency] = useCurrency()
 
   useEffect(() => setMounted(true), [])
 
@@ -51,16 +122,21 @@ export default function Home() {
 
   if (!mounted) return null
 
+  const priceIn = (p: PriceData) => currency === 'gbp' ? p.gbp : p.usd
+
   const portfolioValue = (portfolioId: string) =>
     holdings
       .filter(h => h.portfolioId === portfolioId)
-      .reduce((sum, h) => sum + (prices[h.symbol]?.price != null ? h.amount * prices[h.symbol].price : 0), 0)
+      .reduce((sum, h) => {
+        const p = prices[h.symbol]
+        return sum + (p != null ? h.amount * priceIn(p) : 0)
+      }, 0)
 
   const grandTotal = portfolios.reduce((sum, p) => sum + portfolioValue(p.id), 0)
 
   return (
     <>
-      <main className="min-h-screen bg-gray-950 text-white pb-20">
+      <main className="min-h-screen bg-gray-950 text-white pb-24">
         <div className="max-w-5xl mx-auto px-6 py-12">
 
           {portfolios.length === 0 ? (
@@ -76,7 +152,6 @@ export default function Home() {
 
                 return (
                   <section key={p.id}>
-                    {/* Portfolio header */}
                     <div className="group flex items-start justify-between mb-4">
                       <div>
                         <div className="flex items-center gap-3">
@@ -90,11 +165,10 @@ export default function Home() {
                           </button>
                         </div>
                         <p className="text-xs text-gray-500 mt-1">Total Value</p>
-                        <p className="text-3xl font-bold text-white tabular-nums">{formatValue(value)}</p>
+                        <p className="text-3xl font-bold text-white tabular-nums">{formatValue(value, currency)}</p>
                       </div>
                     </div>
 
-                    {/* Holdings table */}
                     <div className="w-full overflow-x-auto rounded-xl border border-gray-800">
                       <table className="w-full border-collapse">
                         <thead>
@@ -117,8 +191,9 @@ export default function Home() {
                             </tr>
                           ) : (
                             myHoldings.map((h, i) => {
-                              const p2 = prices[h.symbol]
-                              const val = p2 != null ? h.amount * p2.price : null
+                              const pd = prices[h.symbol]
+                              const price = pd != null ? priceIn(pd) : null
+                              const val = price != null ? h.amount * price : null
                               const isLast = i === myHoldings.length - 1
 
                               return (
@@ -128,32 +203,36 @@ export default function Home() {
                                 >
                                   <td className="pl-4 py-3.5">
                                     <div className="flex items-center gap-3">
-                                      {p2?.image ? (
+                                      {pd?.image ? (
                                         // eslint-disable-next-line @next/next/no-img-element
-                                        <img src={p2.image} alt={p2.name} width={26} height={26} className="rounded-full flex-shrink-0" />
+                                        <img src={pd.image} alt={pd.name} width={26} height={26} className="rounded-full flex-shrink-0" />
                                       ) : (
                                         <div className="w-[26px] h-[26px] rounded-full bg-gray-800 flex-shrink-0" />
                                       )}
                                       <div>
                                         <span className="font-semibold text-white text-sm">{h.symbol}</span>
-                                        {p2?.name && <p className="text-xs text-gray-500 leading-tight">{p2.name}</p>}
+                                        {pd?.name && <p className="text-xs text-gray-500 leading-tight">{pd.name}</p>}
                                       </div>
                                     </div>
                                   </td>
-                                  <td className="text-right pr-4 py-3.5 text-gray-400 font-mono text-sm tabular-nums">
-                                    {formatAmount(h.amount)}
+                                  <td className="text-right pr-4 py-3.5">
+                                    <AmountCell
+                                      holdingId={h.id}
+                                      amount={h.amount}
+                                      onSave={(id, amount) => updateHolding(id, { amount })}
+                                    />
                                   </td>
                                   <td className="text-right pr-4 py-3.5 text-gray-300 font-mono text-sm tabular-nums">
-                                    {p2 ? formatPrice(p2.price) : <span className="text-gray-600">—</span>}
+                                    {pd ? formatPrice(price!, currency) : <span className="text-gray-600">—</span>}
                                   </td>
                                   <td className="text-right pr-4 py-3.5 font-mono text-sm tabular-nums">
-                                    <ChangeCell value={p2?.change1h} />
+                                    <ChangeCell value={pd?.change1h} />
                                   </td>
                                   <td className="text-right pr-4 py-3.5 font-mono text-sm tabular-nums">
-                                    <ChangeCell value={p2?.change24h} />
+                                    <ChangeCell value={pd?.change24h} />
                                   </td>
                                   <td className="text-right pr-4 py-3.5 text-white font-mono text-sm tabular-nums">
-                                    {val != null ? formatValue(val) : <span className="text-gray-600">—</span>}
+                                    {val != null ? formatValue(val, currency) : <span className="text-gray-600">—</span>}
                                   </td>
                                   <td className="pr-3 py-3.5 w-8">
                                     <button
@@ -170,7 +249,6 @@ export default function Home() {
                         </tbody>
                       </table>
 
-                      {/* Add token — bottom right of table */}
                       <div className="flex justify-end px-3 py-2 border-t border-gray-800/50">
                         <button
                           onClick={() => setAddingTo(p.id)}
@@ -188,19 +266,26 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Sticky footer */}
       <footer className="fixed bottom-0 left-0 right-0 bg-gray-950/95 backdrop-blur border-t border-gray-800 z-40">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-600 uppercase tracking-wider">Total</p>
-            <p className="text-white font-bold text-lg tabular-nums">{formatValue(grandTotal)}</p>
+            <p className="text-white font-bold text-lg tabular-nums">{formatValue(grandTotal, currency)}</p>
           </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-colors"
-          >
-            <span className="text-base leading-none">+</span> New Portfolio
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleCurrency}
+              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors tabular-nums"
+            >
+              {currency === 'usd' ? '$ USD' : '£ GBP'}
+            </button>
+            <button
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-colors"
+            >
+              <span className="text-base leading-none">+</span> New Portfolio
+            </button>
+          </div>
         </div>
       </footer>
 
@@ -210,7 +295,6 @@ export default function Home() {
           onCreate={name => addPortfolio(name)}
         />
       )}
-
       {addingTo && (
         <AddHoldingModal
           onClose={() => setAddingTo(null)}

@@ -57,7 +57,7 @@ export default function PortfolioPage() {
   const { prices, loading } = usePrices(mounted ? symbols : [])
 
   const totalValue = myHoldings.reduce((sum, h) => {
-    const p = prices[h.symbol]?.price
+    const p = prices[h.symbol]?.usd
     return sum + (p != null ? h.amount * p : 0)
   }, 0)
 
@@ -126,7 +126,7 @@ export default function PortfolioPage() {
               <tbody className="space-y-2">
                 {myHoldings.map(h => {
                   const p = prices[h.symbol]
-                  const value = p != null ? h.amount * p.price : null
+                  const value = p != null ? h.amount * p.usd : null
 
                   return (
                     <tr
@@ -156,7 +156,7 @@ export default function PortfolioPage() {
 
                       {/* Price */}
                       <td className="text-right pr-4 py-4 text-gray-300 font-mono text-sm tabular-nums">
-                        {loading && !p ? <span className="text-gray-600">—</span> : p ? formatPrice(p.price) : <span className="text-gray-600">—</span>}
+                        {loading && !p ? <span className="text-gray-600">—</span> : p ? formatPrice(p.usd) : <span className="text-gray-600">—</span>}
                       </td>
 
                       {/* 1h */}
