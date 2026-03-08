@@ -28,20 +28,43 @@ function useCurrency(): [Currency, () => void] {
 
 function usePrices(symbols: string[]) {
   const [prices, setPrices] = useState<Record<string, PriceData>>({})
+  const [loading, setLoading] = useState(false)
   const key = symbols.join(',')
   const fetchPrices = useCallback(async () => {
     if (!key) return
+    setLoading(true)
     try {
       const res = await fetch(`/api/prices?symbols=${key}`)
       if (res.ok) setPrices(await res.json())
     } catch {}
+    finally { setLoading(false) }
   }, [key])
   useEffect(() => {
     fetchPrices()
     const id = setInterval(fetchPrices, 60_000)
     return () => clearInterval(id)
   }, [fetchPrices])
-  return prices
+  return { prices, loading, refresh: fetchPrices }
+}
+
+function RefreshButton({ onClick, spinning }: { onClick: () => void; spinning: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      title="Refresh prices"
+      className="text-gray-600 hover:text-gray-300 transition-colors p-1 rounded-lg hover:bg-gray-800"
+    >
+      <svg
+        className={`w-4 h-4 ${spinning ? 'animate-spin' : ''}`}
+        viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+        strokeLinecap="round" strokeLinejoin="round"
+      >
+        <path d="M23 4v6h-6" />
+        <path d="M1 20v-6h6" />
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+      </svg>
+    </button>
+  )
 }
 
 function ChangeCell({ value }: { value: number | null | undefined }) {
@@ -109,7 +132,7 @@ export default function Home() {
   useEffect(() => setMounted(true), [])
 
   const allSymbols = mounted ? [...new Set(holdings.map(h => h.symbol))] : []
-  const prices = usePrices(allSymbols)
+  const { prices, loading, refresh } = usePrices(allSymbols)
   if (!mounted) return null
 
   const priceIn = (p: PriceData) => currency === 'gbp' ? p.gbp : p.usd
@@ -147,7 +170,10 @@ export default function Home() {
                           >✕</button>
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5 uppercase tracking-wider">Total Value</p>
-                        <p className="text-3xl font-bold text-white tabular-nums mt-0.5">{formatValue(value, currency)}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <p className="text-3xl font-bold text-white tabular-nums">{formatValue(value, currency)}</p>
+                          <RefreshButton onClick={refresh} spinning={loading} />
+                        </div>
                       </div>
                     </div>
 
@@ -249,7 +275,10 @@ export default function Home() {
         <div className="max-w-5xl mx-auto px-6 py-3.5 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-wider">Total</p>
-            <p className="text-xl font-bold text-white tabular-nums">{formatValue(grandTotal, currency)}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xl font-bold text-white tabular-nums">{formatValue(grandTotal, currency)}</p>
+              <RefreshButton onClick={refresh} spinning={loading} />
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
