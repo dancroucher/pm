@@ -77,20 +77,21 @@ export default function Home() {
                 return (
                   <section key={p.id}>
                     {/* Portfolio header */}
-                    <div className="group flex items-baseline justify-between mb-4">
+                    <div className="group flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <h2 className="text-lg font-semibold text-white">{p.name}</h2>
+                        <h2 className="text-2xl font-bold tracking-tight text-white">{p.name}</h2>
                         <button
                           onClick={() => removePortfolio(p.id)}
-                          className="opacity-0 group-hover:opacity-100 text-gray-700 hover:text-red-400 transition-all text-xs"
+                          className="opacity-0 group-hover:opacity-100 text-gray-700 hover:text-red-400 transition-all text-xs mt-1"
                           title="Delete portfolio"
                         >
                           ✕
                         </button>
                       </div>
-                      <span className="text-white font-semibold tabular-nums">
-                        {formatValue(value)}
-                      </span>
+                      <div className="text-right">
+                        <p className="text-xs text-gray-500">Total Value</p>
+                        <p className="text-3xl font-bold text-white tabular-nums">{formatValue(value)}</p>
+                      </div>
                     </div>
 
                     {/* Holdings table */}
