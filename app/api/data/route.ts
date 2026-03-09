@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { put, list, getDownloadUrl } from '@vercel/blob'
+import { put, list, get } from '@vercel/blob'
 
 const BLOB_PATH = 'portfolio/state.json'
 const EMPTY = { portfolios: [], holdings: [] }
@@ -8,16 +8,16 @@ export async function GET() {
   try {
     const { blobs } = await list({ prefix: 'portfolio/state' })
     const blob = blobs[0]
-    if (!blob) return NextResponse.json({ ...EMPTY, _debug: 'no blob found' })
+    if (!blob) return NextResponse.json(EMPTY)
 
-    const downloadUrl = await getDownloadUrl(blob.url)
-    const res = await fetch(downloadUrl, { cache: 'no-store' })
-    if (!res.ok) return NextResponse.json({ ...EMPTY, _debug: `fetch failed: ${res.status}` })
-    return NextResponse.json(await res.json())
+    // Use get() for private blobs — reads server-side with the token
+    const result = await get(blob.url)
+    const data = await result.json()
+    return NextResponse.json(data)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     console.error('GET /api/data error:', msg)
-    return NextResponse.json({ ...EMPTY, _debug: msg }, { status: 502 })
+    return NextResponse.json(EMPTY, { status: 502 })
   }
 }
 
