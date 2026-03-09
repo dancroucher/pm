@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
     const blob = await put(BLOB_PATH, JSON.stringify(body), {
       access: 'private',
       addRandomSuffix: false,
+      allowOverwrite: true,
       contentType: 'application/json',
     })
     return NextResponse.json({ ok: true, url: blob.url })
