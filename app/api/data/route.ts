@@ -11,7 +11,8 @@ export async function GET() {
     if (!blob) return NextResponse.json(EMPTY)
 
     // Use get() for private blobs — reads server-side with the token
-    const result = await get(blob.url)
+    const result = await get(blob.url, {})
+    if (!result) return NextResponse.json(EMPTY)
     const data = await result.json()
     return NextResponse.json(data)
   } catch (e) {
