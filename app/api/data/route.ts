@@ -8,16 +8,16 @@ export async function GET() {
   try {
     const { blobs } = await list({ prefix: 'portfolio/state' })
     const blob = blobs[0]
-    if (!blob) return NextResponse.json(EMPTY)
+    if (!blob) return NextResponse.json({ ...EMPTY, _debug: 'no blob found' })
 
-    // Private blob — use getDownloadUrl for a temporary signed URL
     const downloadUrl = await getDownloadUrl(blob.url)
     const res = await fetch(downloadUrl, { cache: 'no-store' })
-    if (!res.ok) return NextResponse.json(EMPTY)
+    if (!res.ok) return NextResponse.json({ ...EMPTY, _debug: `fetch failed: ${res.status}` })
     return NextResponse.json(await res.json())
   } catch (e) {
-    console.error('GET /api/data error:', e)
-    return NextResponse.json(EMPTY, { status: 502 })
+    const msg = e instanceof Error ? e.message : String(e)
+    console.error('GET /api/data error:', msg)
+    return NextResponse.json({ ...EMPTY, _debug: msg }, { status: 502 })
   }
 }
 
