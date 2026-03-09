@@ -29,13 +29,14 @@ async function verifyToken(token: string, secret: string): Promise<boolean> {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Allow auth endpoint, lock page, and data sync API without session
+  // Allow auth endpoint, lock page, and all API routes without session
   if (
     pathname.startsWith('/lock') ||
-    pathname.startsWith('/api/auth') ||
-    pathname.startsWith('/api/data')
+    pathname.startsWith('/api/')
   ) {
-    return NextResponse.next()
+    const res = NextResponse.next()
+    res.headers.set('x-mw', 'v2')
+    return res
   }
 
   const token = request.cookies.get(COOKIE_NAME)?.value
