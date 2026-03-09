@@ -326,7 +326,7 @@ export default function Home() {
                     {/* Holdings */}
                     <div className="bg-gray-900 rounded-2xl overflow-hidden">
                       {/* Desktop table - hidden on mobile */}
-                      <table className="hidden md:table w-full border-collapse">
+                      <table className="hidden lg:table w-full border-collapse">
                         <thead>
                           <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-800">
                             <th className="text-left py-3 pl-5 font-medium">Token</th>
@@ -426,7 +426,7 @@ export default function Home() {
                       </table>
 
                       {/* Mobile cards - hidden on desktop */}
-                      <div className="md:hidden divide-y divide-gray-800">
+                      <div className="lg:hidden divide-y divide-gray-800">
                         {myHoldings.length === 0 ? (
                           <div className="py-10 text-center text-gray-600 text-sm">No tokens yet</div>
                         ) : myHoldings.map(h => {
