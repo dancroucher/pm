@@ -3,7 +3,7 @@ export type Currency = 'usd' | 'gbp'
 export function formatPrice(price: number, currency: Currency = 'usd'): string {
   const curr = currency.toUpperCase()
   if (price >= 0.01) {
-    return new Intl.NumberFormat('en-GB', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: curr,
       maximumFractionDigits: price >= 1 ? 2 : 4,
@@ -14,7 +14,7 @@ export function formatPrice(price: number, currency: Currency = 'usd'): string {
 }
 
 export function formatValue(value: number, currency: Currency = 'usd'): string {
-  return new Intl.NumberFormat('en-GB', {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency.toUpperCase(),
     maximumFractionDigits: 2,

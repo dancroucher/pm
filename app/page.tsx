@@ -9,6 +9,51 @@ import type { Currency } from '@/lib/format'
 import type { PriceData } from '@/app/api/prices/route'
 
 const CURRENCY_KEY = 'jeem-folio-currency'
+const SNAPSHOT_KEY = 'jeem-folio-snapshot'
+const SNAPSHOT_TTL = 24 * 60 * 60 * 1000
+
+interface Snapshot {
+  ts: number
+  prices: Record<string, { usd: number; gbp: number }>
+}
+
+function useSnapshot(prices: Record<string, PriceData>) {
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null)
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SNAPSHOT_KEY)
+      if (raw) setSnapshot(JSON.parse(raw))
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    if (Object.keys(prices).length === 0) return
+    const now = Date.now()
+    const isStale = !snapshot || now - snapshot.ts >= SNAPSHOT_TTL
+    if (isStale) {
+      const next: Snapshot = {
+        ts: now,
+        prices: Object.fromEntries(Object.entries(prices).map(([sym, p]) => [sym, { usd: p.usd, gbp: p.gbp }])),
+      }
+      setSnapshot(next)
+      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(next))
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prices])
+
+  const reset = useCallback(() => {
+    if (Object.keys(prices).length === 0) return
+    const next: Snapshot = {
+      ts: Date.now(),
+      prices: Object.fromEntries(Object.entries(prices).map(([sym, p]) => [sym, { usd: p.usd, gbp: p.gbp }])),
+    }
+    setSnapshot(next)
+    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(next))
+  }, [prices])
+
+  return { snapshot, reset }
+}
 
 function useCurrency(): [Currency, () => void] {
   const [currency, setCurrency] = useState<Currency>('usd')
@@ -122,21 +167,96 @@ function AmountCell({ holdingId, amount, onSave }: {
   )
 }
 
+function CostBasisCell({ portfolioId, costBasisGbp, onSave, currency, gbpPerUsd }: {
+  portfolioId: string; costBasisGbp?: number; onSave: (id: string, v: number | undefined) => void
+  currency: Currency; gbpPerUsd: number
+}) {
+  const [editing, setEditing] = useState(false)
+  const [val, setVal] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const displayValue = costBasisGbp != null
+    ? (currency === 'gbp' ? costBasisGbp : costBasisGbp / gbpPerUsd)
+    : undefined
+
+  const startEdit = () => {
+    setVal(displayValue != null ? displayValue.toFixed(2) : '')
+    setEditing(true)
+    setTimeout(() => inputRef.current?.select(), 0)
+  }
+  const commit = () => {
+    const parsed = parseFloat(val)
+    if (isNaN(parsed) || parsed < 0) {
+      onSave(portfolioId, undefined)
+    } else {
+      const asGbp = currency === 'gbp' ? parsed : parsed * gbpPerUsd
+      onSave(portfolioId, asGbp)
+    }
+    setEditing(false)
+  }
+  const cancel = () => setEditing(false)
+
+  const sym = currency === 'gbp' ? '£' : '$'
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="number"
+        value={val}
+        min="0"
+        step="any"
+        placeholder="0"
+        onChange={e => setVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') cancel() }}
+        className="w-32 bg-gray-700 text-white text-sm tabular-nums rounded-lg px-2 py-0.5 outline-none focus:ring-1 focus:ring-indigo-500"
+      />
+    )
+  }
+
+  return (
+    <span
+      onClick={startEdit}
+      title="Click to set cost basis"
+      className="text-gray-500 text-sm tabular-nums cursor-pointer hover:text-gray-300 transition-colors"
+    >
+      {displayValue != null
+        ? `Cost ${sym}${displayValue.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+        : <span className="text-gray-600 text-xs">+ cost basis</span>}
+    </span>
+  )
+}
+
 export default function Home() {
   useInitStore()
-  const { portfolios, holdings, addPortfolio, removePortfolio, addHolding, removeHolding, updateHolding } = usePortfolioStore()
+  const { portfolios, holdings, addPortfolio, removePortfolio, addHolding, removeHolding, updateHolding, updatePortfolio } = usePortfolioStore()
   const [showCreate, setShowCreate] = useState(false)
   const [addingTo, setAddingTo] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [currency, toggleCurrency] = useCurrency()
+  const [confirmPortfolio, setConfirmPortfolio] = useState<string | null>(null)
+  const [confirmHolding, setConfirmHolding] = useState<string | null>(null)
 
   useEffect(() => setMounted(true), [])
 
   const allSymbols = mounted ? [...new Set(holdings.map(h => h.symbol))] : []
   const { prices, loading, refresh } = usePrices(allSymbols)
+  const { snapshot, reset: resetSnapshot } = useSnapshot(prices)
   if (!mounted) return null
 
+  const snapshotAge = snapshot ? (() => {
+    const hrs = (Date.now() - snapshot.ts) / 3_600_000
+    if (hrs < 1) return `${Math.round(hrs * 60)}m ago`
+    if (hrs < 24) return `${Math.round(hrs)}h ago`
+    return `${Math.round(hrs / 24)}d ago`
+  })() : null
+
   const priceIn = (p: PriceData) => currency === 'gbp' ? p.gbp : p.usd
+  const gbpPerUsd = (() => {
+    const pd = Object.values(prices).find(p => p.usd > 0 && p.gbp > 0)
+    return pd ? pd.gbp / pd.usd : 0.79
+  })()
   const portfolioValue = (portfolioId: string) =>
     holdings.filter(h => h.portfolioId === portfolioId)
       .reduce((sum, h) => { const p = prices[h.symbol]; return sum + (p != null ? h.amount * priceIn(p) : 0) }, 0)
@@ -165,13 +285,41 @@ export default function Home() {
                       <div>
                         <div className="flex items-center gap-3">
                           <h2 className="text-2xl font-semibold tracking-tight text-white">{p.name}</h2>
-                          <button
-                            onClick={() => removePortfolio(p.id)}
-                            className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all text-sm"
-                          >✕</button>
+                          {confirmPortfolio === p.id ? (
+                            <span className="flex items-center gap-1.5 text-sm">
+                              <span className="text-gray-400">Delete?</span>
+                              <button onClick={() => { removePortfolio(p.id); setConfirmPortfolio(null) }} className="text-red-400 hover:text-red-300 font-medium">Yes</button>
+                              <button onClick={() => setConfirmPortfolio(null)} className="text-gray-500 hover:text-gray-300">No</button>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmPortfolio(p.id)}
+                              className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all text-sm"
+                            >✕</button>
+                          )}
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5 uppercase tracking-wider">Total Value</p>
                         <p className="text-3xl font-bold text-white tabular-nums mt-0.5">{formatValue(value, currency)}</p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <CostBasisCell
+                            portfolioId={p.id}
+                            costBasisGbp={p.costBasisGbp}
+                            onSave={(id, v) => updatePortfolio(id, { costBasisGbp: v })}
+                            currency={currency}
+                            gbpPerUsd={gbpPerUsd}
+                          />
+                          {p.costBasisGbp != null && (() => {
+                            const costInCurrency = currency === 'gbp' ? p.costBasisGbp : p.costBasisGbp / gbpPerUsd
+                            const pl = value - costInCurrency
+                            const pct = (pl / costInCurrency) * 100
+                            const pos = pl >= 0
+                            return (
+                              <span className={`text-sm font-medium tabular-nums ${pos ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {pos ? '+' : ''}{formatValue(pl, currency)} ({pos ? '+' : ''}{pct.toFixed(2)}%)
+                              </span>
+                            )
+                          })()}
+                        </div>
                       </div>
                     </div>
 
@@ -186,13 +334,22 @@ export default function Home() {
                             <th className="text-right py-3 pr-5 font-medium">1h</th>
                             <th className="text-right py-3 pr-5 font-medium">24h</th>
                             <th className="text-right py-3 pr-5 font-medium">Value</th>
+                            <th className="text-right py-3 pr-5 font-medium">
+                              <button
+                                onClick={resetSnapshot}
+                                title="Reset snapshot baseline"
+                                className="normal-case tracking-normal font-normal text-gray-600 hover:text-gray-400 transition-colors"
+                              >
+                                {snapshotAge ? `vs ${snapshotAge} ↺` : 'Gain/Loss'}
+                              </button>
+                            </th>
                             <th className="py-3 w-8" />
                           </tr>
                         </thead>
                         <tbody>
                           {myHoldings.length === 0 ? (
                             <tr>
-                              <td colSpan={7} className="py-10 text-center text-gray-600 text-sm">
+                              <td colSpan={8} className="py-10 text-center text-gray-600 text-sm">
                                 No tokens yet
                               </td>
                             </tr>
@@ -201,6 +358,9 @@ export default function Home() {
                             const price = pd != null ? priceIn(pd) : null
                             const val = price != null ? h.amount * price : null
                             const isLast = i === myHoldings.length - 1
+                            const snapPrice = snapshot?.prices[h.symbol]
+                            const snapVal = snapPrice != null ? h.amount * (currency === 'gbp' ? snapPrice.gbp : snapPrice.usd) : null
+                            const snapDelta = val != null && snapVal != null ? val - snapVal : null
 
                             return (
                               <tr
@@ -238,11 +398,25 @@ export default function Home() {
                                 <td className="text-right pr-5 py-4 text-white font-semibold text-sm tabular-nums">
                                   {val != null ? formatValue(val, currency) : <span className="text-gray-600">—</span>}
                                 </td>
-                                <td className="pr-4 py-4 w-8">
-                                  <button
-                                    onClick={() => removeHolding(h.id)}
-                                    className="opacity-0 group-hover/row:opacity-100 text-gray-600 hover:text-red-400 transition-all text-xs"
-                                  >✕</button>
+                                <td className="text-right pr-5 py-4 text-sm tabular-nums">
+                                  {snapDelta != null
+                                    ? <span className={`font-medium ${snapDelta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        {snapDelta >= 0 ? '+' : ''}{formatValue(snapDelta, currency)}
+                                      </span>
+                                    : <span className="text-gray-600">—</span>}
+                                </td>
+                                <td className="pr-4 py-4 w-20 text-right">
+                                  {confirmHolding === h.id ? (
+                                    <span className="flex items-center justify-end gap-1.5 text-xs">
+                                      <button onClick={() => { removeHolding(h.id); setConfirmHolding(null) }} className="text-red-400 hover:text-red-300 font-medium">Yes</button>
+                                      <button onClick={() => setConfirmHolding(null)} className="text-gray-500 hover:text-gray-300">No</button>
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => setConfirmHolding(h.id)}
+                                      className="opacity-0 group-hover/row:opacity-100 text-gray-600 hover:text-red-400 transition-all text-xs"
+                                    >✕</button>
+                                  )}
                                 </td>
                               </tr>
                             )
@@ -296,7 +470,13 @@ export default function Home() {
       </footer>
 
       {showCreate && (
-        <CreatePortfolioModal onClose={() => setShowCreate(false)} onCreate={name => addPortfolio(name)} />
+        <CreatePortfolioModal
+          onClose={() => setShowCreate(false)}
+          onCreate={(name, holdings) => {
+            const p = addPortfolio(name)
+            holdings?.forEach(h => addHolding(p.id, h.symbol, h.amount))
+          }}
+        />
       )}
       {addingTo && (
         <AddHoldingModal onClose={() => setAddingTo(null)} onAdd={(symbol, amount) => addHolding(addingTo, symbol, amount)} />

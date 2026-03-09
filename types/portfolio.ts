@@ -2,6 +2,7 @@ export interface Portfolio {
   id: string
   name: string
   createdAt: string
+  costBasisGbp?: number
 }
 
 export interface Holding {

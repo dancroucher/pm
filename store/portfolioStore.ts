@@ -9,16 +9,19 @@ function genId(): string {
 }
 
 const STORAGE_KEY = 'jeem-folio-state'
+const EMPTY: AppState = { portfolios: [], holdings: [] }
 
-function loadFromStorage(): AppState {
+// --- Local persistence ---
+
+function loadLocal(): AppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) return JSON.parse(raw) as AppState
   } catch {}
-  return { portfolios: [], holdings: [] }
+  return EMPTY
 }
 
-function saveToStorage(state: AppState) {
+function saveLocal(state: AppState) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       portfolios: state.portfolios,
@@ -27,13 +30,77 @@ function saveToStorage(state: AppState) {
   } catch {}
 }
 
+// --- Remote persistence with debounce + retry ---
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+let saveInFlight = false
+let pendingState: AppState | null = null
+
+function saveRemote(state: AppState) {
+  pendingState = state
+
+  // Debounce: wait 500ms after last mutation before sending
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => flushRemote(), 500)
+}
+
+async function flushRemote(retries = 2) {
+  if (saveInFlight || !pendingState) return
+  saveInFlight = true
+  const state = pendingState
+  pendingState = null
+
+  try {
+    const r = await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ portfolios: state.portfolios, holdings: state.holdings }),
+    })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  } catch (e) {
+    console.error('saveRemote failed:', e)
+    if (retries > 0) {
+      // Retry after 2s backoff
+      pendingState = state
+      setTimeout(() => {
+        saveInFlight = false
+        flushRemote(retries - 1)
+      }, 2000)
+      return
+    }
+    console.error('saveRemote gave up after retries')
+  }
+
+  saveInFlight = false
+
+  // If another save was queued while we were in flight, flush it
+  if (pendingState) {
+    setTimeout(() => flushRemote(), 100)
+  }
+}
+
+// --- Combined save ---
+
+function save(state: AppState) {
+  saveLocal(state)
+  saveRemote(state)
+}
+
+// --- Dirty tracking: prevents blob from overwriting user edits during init ---
+
+let userDirty = false
+
+function markDirty() {
+  userDirty = true
+}
+
+// --- Store ---
+
 interface PortfolioStore extends AppState {
-  // portfolios
   addPortfolio: (name: string) => Portfolio
   removePortfolio: (id: string) => void
   renamePortfolio: (id: string, name: string) => void
-
-  // holdings
+  updatePortfolio: (id: string, patch: Partial<Pick<Portfolio, 'name' | 'costBasisGbp'>>) => void
   addHolding: (portfolioId: string, symbol: string, amount: number) => Holding
   updateHolding: (id: string, patch: Partial<Pick<Holding, 'symbol' | 'amount'>>) => void
   removeHolding: (id: string) => void
@@ -46,10 +113,10 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
   holdings: [],
 
   addPortfolio(name) {
-    if (!initialised) { set(loadFromStorage()); initialised = true }
     const portfolio: Portfolio = { id: genId(), name: name.trim(), createdAt: new Date().toISOString() }
     set(s => ({ portfolios: [...s.portfolios, portfolio] }))
-    saveToStorage(get())
+    markDirty()
+    save(get())
     return portfolio
   },
 
@@ -58,18 +125,27 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
       portfolios: s.portfolios.filter(p => p.id !== id),
       holdings: s.holdings.filter(h => h.portfolioId !== id),
     }))
-    saveToStorage(get())
+    markDirty()
+    save(get())
   },
 
   renamePortfolio(id, name) {
     set(s => ({ portfolios: s.portfolios.map(p => p.id === id ? { ...p, name } : p) }))
-    saveToStorage(get())
+    markDirty()
+    save(get())
+  },
+
+  updatePortfolio(id, patch) {
+    set(s => ({ portfolios: s.portfolios.map(p => p.id === id ? { ...p, ...patch } : p) }))
+    markDirty()
+    save(get())
   },
 
   addHolding(portfolioId, symbol, amount) {
     const holding: Holding = { id: genId(), portfolioId, symbol: symbol.toUpperCase().trim(), amount }
     set(s => ({ holdings: [...s.holdings, holding] }))
-    saveToStorage(get())
+    markDirty()
+    save(get())
     return holding
   },
 
@@ -77,20 +153,51 @@ export const usePortfolioStore = create<PortfolioStore>()((set, get) => ({
     set(s => ({
       holdings: s.holdings.map(h => h.id === id ? { ...h, ...patch } : h),
     }))
-    saveToStorage(get())
+    markDirty()
+    save(get())
   },
 
   removeHolding(id) {
     set(s => ({ holdings: s.holdings.filter(h => h.id !== id) }))
-    saveToStorage(get())
+    markDirty()
+    save(get())
   },
 }))
 
 export function useInitStore() {
-  const store = usePortfolioStore
   if (!initialised && typeof window !== 'undefined') {
-    const saved = loadFromStorage()
-    store.setState(saved)
     initialised = true
+    userDirty = false
+
+    // Load from localStorage immediately for fast render
+    const local = loadLocal()
+    usePortfolioStore.setState(local)
+
+    // Then fetch from blob and reconcile
+    fetch('/api/data')
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
+      .then((remote: AppState) => {
+        // If user already made changes, don't overwrite — push local to blob instead
+        if (userDirty) {
+          saveRemote(usePortfolioStore.getState())
+          return
+        }
+
+        if (remote?.portfolios?.length) {
+          // Blob has data and user hasn't touched anything — use blob as authoritative
+          usePortfolioStore.setState(remote)
+          saveLocal(remote)
+        } else if (local.portfolios.length) {
+          // Blob is empty but local has data — migrate local up to blob
+          saveRemote(local)
+        }
+      })
+      .catch(e => {
+        console.error('Init fetch from blob failed:', e)
+        // Local data is already loaded, so app still works
+      })
   }
 }

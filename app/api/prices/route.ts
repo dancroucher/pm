@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
 
   for (const sym of symbols) {
     const entry = priceCache.get(sym)
-    if (entry && now - entry.ts < CACHE_TTL) {
+    if (!force && entry && now - entry.ts < CACHE_TTL) {
       const { ts: _ts, ...data } = entry
       result[sym] = data
     } else {
