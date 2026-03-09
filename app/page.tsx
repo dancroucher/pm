@@ -265,7 +265,7 @@ export default function Home() {
   return (
     <>
       <main className="min-h-screen pb-24">
-        <div className="max-w-5xl mx-auto px-6 py-10">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6 py-6 sm:py-10">
 
           {portfolios.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-48 text-gray-600">
@@ -299,7 +299,7 @@ export default function Home() {
                           )}
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5 uppercase tracking-wider">Total Value</p>
-                        <p className="text-3xl font-bold text-white tabular-nums mt-0.5">{formatValue(value, currency)}</p>
+                        <p className="text-2xl sm:text-3xl font-bold text-white tabular-nums mt-0.5">{formatValue(value, currency)}</p>
                         <div className="flex items-center gap-3 mt-1">
                           <CostBasisCell
                             portfolioId={p.id}
@@ -323,9 +323,10 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* Table */}
+                    {/* Holdings */}
                     <div className="bg-gray-900 rounded-2xl overflow-hidden">
-                      <table className="w-full border-collapse">
+                      {/* Desktop table - hidden on mobile */}
+                      <table className="hidden md:table w-full border-collapse">
                         <thead>
                           <tr className="text-xs text-gray-500 uppercase tracking-wider border-b border-gray-800">
                             <th className="text-left py-3 pl-5 font-medium">Token</th>
@@ -424,6 +425,77 @@ export default function Home() {
                         </tbody>
                       </table>
 
+                      {/* Mobile cards - hidden on desktop */}
+                      <div className="md:hidden divide-y divide-gray-800">
+                        {myHoldings.length === 0 ? (
+                          <div className="py-10 text-center text-gray-600 text-sm">No tokens yet</div>
+                        ) : myHoldings.map(h => {
+                          const pd = prices[h.symbol]
+                          const price = pd != null ? priceIn(pd) : null
+                          const val = price != null ? h.amount * price : null
+                          const snapPrice = snapshot?.prices[h.symbol]
+                          const snapVal = snapPrice != null ? h.amount * (currency === 'gbp' ? snapPrice.gbp : snapPrice.usd) : null
+                          const snapDelta = val != null && snapVal != null ? val - snapVal : null
+
+                          return (
+                            <div key={h.id} className="group/row px-4 py-3">
+                              {/* Row 1: Token info + Value */}
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                  {pd?.image ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={pd.image} alt={pd.name} width={32} height={32} className="rounded-full flex-shrink-0" />
+                                  ) : (
+                                    <div className="w-8 h-8 rounded-full bg-gray-700 flex-shrink-0 flex items-center justify-center text-xs text-gray-500 font-bold">
+                                      {h.symbol.slice(0, 2)}
+                                    </div>
+                                  )}
+                                  <div>
+                                    <p className="font-semibold text-white text-sm">{h.symbol}</p>
+                                    {pd?.name && <p className="text-xs text-gray-500 leading-tight">{pd.name}</p>}
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-white font-semibold text-sm tabular-nums">
+                                    {val != null ? formatValue(val, currency) : <span className="text-gray-600">—</span>}
+                                  </p>
+                                  {snapDelta != null && (
+                                    <p className={`text-xs tabular-nums font-medium ${snapDelta >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                      {snapDelta >= 0 ? '+' : ''}{formatValue(snapDelta, currency)}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              {/* Row 2: Amount, Price, Changes, Delete */}
+                              <div className="flex items-center justify-between mt-2 text-xs">
+                                <div className="flex items-center gap-3">
+                                  <AmountCell holdingId={h.id} amount={h.amount} onSave={(id, amt) => updateHolding(id, { amount: amt })} />
+                                  <span className="text-gray-500">@</span>
+                                  <span className="text-gray-400 tabular-nums">
+                                    {pd ? formatPrice(price!, currency) : '—'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <span className="tabular-nums"><ChangeCell value={pd?.change1h} /></span>
+                                  <span className="tabular-nums"><ChangeCell value={pd?.change24h} /></span>
+                                  {confirmHolding === h.id ? (
+                                    <span className="flex items-center gap-1.5">
+                                      <button onClick={() => { removeHolding(h.id); setConfirmHolding(null) }} className="text-red-400 hover:text-red-300 font-medium">Yes</button>
+                                      <button onClick={() => setConfirmHolding(null)} className="text-gray-500 hover:text-gray-300">No</button>
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => setConfirmHolding(h.id)}
+                                      className="text-gray-700 active:text-red-400 text-sm"
+                                    >✕</button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+
                       {/* Add token */}
                       <div className="flex justify-end px-4 py-3 border-t border-gray-800">
                         <button
@@ -444,26 +516,26 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="fixed bottom-0 left-0 right-0 z-40 bg-gray-900/90 backdrop-blur-md border-t border-gray-800">
-        <div className="max-w-5xl mx-auto px-6 py-3.5 flex items-center justify-between">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6 py-3 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-wider">Total</p>
             <div className="flex items-center gap-2">
-              <p className="text-xl font-bold text-white tabular-nums">{formatValue(grandTotal, currency)}</p>
+              <p className="text-lg sm:text-xl font-bold text-white tabular-nums">{formatValue(grandTotal, currency)}</p>
               <RefreshButton onClick={refresh} spinning={loading} />
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={toggleCurrency}
-              className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-sm font-medium rounded-xl transition-colors"
+              className="px-2.5 sm:px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs sm:text-sm font-medium rounded-xl transition-colors"
             >
               {currency === 'usd' ? '$ USD' : '£ GBP'}
             </button>
             <button
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-colors"
+              className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-medium rounded-xl transition-colors"
             >
-              <span className="text-base leading-none">+</span> New Portfolio
+              <span className="text-base leading-none">+</span> <span className="hidden sm:inline">New Portfolio</span><span className="sm:hidden">New</span>
             </button>
           </div>
         </div>
