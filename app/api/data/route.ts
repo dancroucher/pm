@@ -13,7 +13,7 @@ export async function GET() {
     // Use get() for private blobs — reads server-side with the token
     const result = await get(blob.url, { access: 'private' })
     if (!result) return NextResponse.json(EMPTY)
-    const data = await result.json()
+    const data = JSON.parse(await new Response(result.stream).text())
     return NextResponse.json(data)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
